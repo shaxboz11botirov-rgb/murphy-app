@@ -46,6 +46,18 @@ h2{font-size:18px;margin:0 0 4px}
 .tab.on{background:var(--accent);color:var(--accent-text)}
 .lesson{line-height:1.65}
 .lesson i{color:var(--hint)}
+.lesson h3{font-size:16px;margin:16px 0 6px;color:var(--accent)}
+.lesson h3:first-child{margin-top:0}
+.lesson table{width:100%;border-collapse:collapse;margin:6px 0 8px;font-size:14px}
+.lesson th,.lesson td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+.lesson th{background:var(--bg);font-weight:600}
+.intro{background:rgba(47,128,237,.10);border-radius:12px;padding:12px 14px;margin-bottom:12px;line-height:1.6}
+.lv{display:flex;gap:8px;margin-top:10px}
+.lv button{flex:1;border:0;border-radius:12px;padding:10px 4px;background:var(--bg);color:var(--text);cursor:pointer;font-size:14px;font-weight:600}
+.lv button small{display:block;font-weight:400;color:var(--hint);font-size:12px;margin-top:2px}
+.lv button:disabled{opacity:.4}
+details.short{margin-top:12px;background:var(--bg);border-radius:12px;padding:10px 12px}
+details.short summary{cursor:pointer;font-weight:600}
 .tip{background:var(--warn-bg);border-radius:12px;padding:12px;margin:12px 0;font-size:15px}
 .ex{display:flex;align-items:center;gap:10px;padding:11px 4px;border-bottom:1px solid var(--line)}
 .ex:last-child{border-bottom:0}
@@ -88,7 +100,7 @@ function readProgress() {
 }
 const best = id => P.b[id];
 const current = () => { const u = UNITS.find(u => u.id >= P.s && !best(u.id)); return u ? u.id : null; };
-const unlocked = id => DEMO || P.a || id < P.s || !!best(id) || (current() !== null && id <= current());
+const unlocked = id => true;   // barcha unitlar ochiq
 const doneCount = () => UNITS.filter(u => best(u.id) || u.id < P.s).length;
 const pct = (s, t) => Math.round(s * 100 / t);
 const cls = p => p >= 80 ? 'ok' : (p >= 50 ? 'mid' : 'low');
@@ -116,9 +128,14 @@ function renderHome() {
   if (DEMO) h += `<div class="tip">Bu sinov rejimi. Natijalar saqlanishi uchun ilovani botdagi <b>📖 Darslar</b> tugmasi orqali oching.</div>`;
   h += `<div class="card"><div style="display:flex;justify-content:space-between"><b>Tugatilgan</b><span><b>${done}</b> / ${total}</span></div>
         <div class="bar"><div style="width:${pct(done, total)}%"></div></div>`;
-  if (cur) h += `<div class="muted">Hozirgi dars: <b>Unit ${cur}</b> — ${esc(BY[cur].title)}</div><button class="btn" onclick="go('unit',${cur})">▶️ Davom etish</button>`;
+  if (cur) h += `<div class="muted">Keyingi tavsiya: <b>Unit ${cur}</b> — ${esc(BY[cur].title)}</div><button class="btn" onclick="go('unit',${cur})">▶️ Davom etish</button>`;
   else h += `<div class="center">🎉 Barcha unitlar tugatilgan!</div>`;
-  h += `</div><input class="search" placeholder="🔍 Mavzu qidirish (masalan: past, will, the)" oninput="filterUnits(this.value)"><div class="list" id="units" style="margin-top:10px"></div>`;
+  h += `</div>`;
+  const dn = reviewUnits().length, R = P.r || {};
+  const lvBtn = (k, name) => { const b = R[k]; return `<button ${dn ? '' : 'disabled'} onclick="startReview('${k}')">${name}<small>${b ? b[0] + '/' + b[1] : '—'}</small></button>`; };
+  h += `<div class="card"><b>🏆 Takrorlash testi</b><div class="muted">${dn ? `Tugatgan ${dn} ta unitingiz asosida, har bosqichda 10 ta savol` : 'Avval kamida bitta unit testini topshiring'}</div>
+        <div class="lv">${lvBtn('easy', '🟢 Easy')}${lvBtn('medium', '🟡 Medium')}${lvBtn('hard', '🔴 Hard')}</div></div>`;
+  h += `<input class="search" placeholder="🔍 Mavzu qidirish (masalan: past, will, the)" oninput="filterUnits(this.value)"><div class="list" id="units" style="margin-top:10px"></div>`;
   app.innerHTML = h;
   filterUnits('');
   const c = document.querySelector('.unit.cur');
@@ -156,8 +173,15 @@ function renderUnit(id) {
   if (tabs.length > 1) h += `<div class="tabs">${tabs.map(t => `<button class="tab ${t[0] === TAB ? 'on' : ''}" onclick="TAB='${t[0]}';renderUnit(${id})">${t[1]}</button>`).join('')}</div>`;
   h += '<div class="card">';
   if (TAB === 'rule') {
-    h += `<div class="lesson">${u.lesson}</div>`;
-    if (u.tip) h += `<div class="tip">💡 ${u.tip}</div>`;
+    if (u.intro) h += `<div class="intro">📘 <b>Bu mavzu nima?</b><br>${u.intro}</div>`;
+    if (u.explain) {
+      h += `<div class="lesson">${u.explain}</div>`;
+      if (u.tip) h += `<div class="tip">💡 <b>O'zbek tili bilan farqi:</b> ${u.tip}</div>`;
+      h += `<details class="short"><summary>📌 Qisqa qoida (takrorlash uchun)</summary><div class="lesson" style="margin-top:8px">${u.lesson}</div></details>`;
+    } else {
+      h += `<div class="lesson">${u.lesson}</div>`;
+      if (u.tip) h += `<div class="tip">💡 ${u.tip}</div>`;
+    }
   } else if (TAB === 'ex') {
     const canSay = 'speechSynthesis' in window;
     h += `<div class="muted" style="margin-bottom:4px">${canSay ? '🔊 tugmasini bosib talaffuzni eshiting' : ''}</div>`;
@@ -175,21 +199,77 @@ function say(id, i) {
 }
 
 let QUIZ = null;
+const LV = {easy: '🟢 Easy', medium: '🟡 Medium', hard: '🔴 Hard'};
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const ansOf = q => q.t === 'choice' ? q.o[q.c] : q.a[0];
+function reviewUnits() {
+  const d = UNITS.filter(u => best(u.id) || u.id < P.s);
+  return d.length || !P.a ? d : UNITS.slice(0, 10);   // o'qituvchi sinab ko'rishi uchun
+}
+function pickBalanced(pools, n) {
+  const out = []; pools = shuffle(pools.map(p => shuffle(p.slice())).filter(p => p.length));
+  while (out.length < n && pools.some(p => p.length)) for (const p of pools) if (p.length && out.length < n) out.push(p.pop());
+  return shuffle(out);
+}
+const qPool = (us, f) => us.map(u => u.q.map((q, i) => ({u, q, i})).filter(x => !f || f(x.q)));
+function buildReview(level) {
+  const us = reviewUnits(), N = 10;
+  if (level === 'easy') {           // hammasi variantli, tarjima bilan
+    return pickBalanced(qPool(us), N).map(({u, q, i}) => {
+      let opts;
+      if (q.t === 'choice') opts = q.o.slice();
+      else {
+        const seen = new Set(q.a.map(norm)), mine = [], rest = [];   // to'g'ri javobning barcha shakllari chiqariladi
+        const add = (arr, x) => { if (!seen.has(norm(x))) { seen.add(norm(x)); arr.push(x); } };
+        u.q.forEach(q2 => (q2.t === 'choice' ? q2.o : q2.a.slice(0, 1)).forEach(x => add(mine, x)));
+        us.forEach(u2 => u2.q.forEach(q2 => add(rest, ansOf(q2))));
+        const wc = x => x.trim().split(/\s+/).length, w0 = wc(q.a[0]), sameW = x => wc(x) === w0;
+        // tartib: shu unitdan + so'zlar soni bir xil → boshqa unitdan + bir xil → qolganlari
+        const order = [...shuffle(mine.filter(sameW)), ...shuffle(rest.filter(sameW)),
+                       ...shuffle(mine.filter(x => !sameW(x))), ...shuffle(rest.filter(x => !sameW(x)))];
+        opts = [q.a[0], ...order.slice(0, 2)];
+      }
+      const right = ansOf(q); opts = shuffle(opts);
+      return {q: q.q, uz: q.uz, t: 'choice', o: opts, c: opts.indexOf(right), w: q.w, ref: [u.id, 'q', i]};
+    });
+  }
+  if (level === 'medium') {         // yozma javob, tarjima bilan
+    let it = pickBalanced(qPool(us, q => q.t === 'fill'), N);
+    if (it.length < N) it = it.concat(pickBalanced(qPool(us, q => q.t === 'choice'), N - it.length));
+    return it.map(({u, q, i}) => Object.assign({}, q, {ref: [u.id, 'q', i]}));
+  }
+  // hard: xatoni tuzatish + yozma javob, tarjimasiz
+  const mis = pickBalanced(us.filter(u => u.mi).map(u => u.mi.map((m, i) => ({u, m, i}))), 4)
+    .map(({u, m, i}) => ({q: "Xatoni toping va gapni to'g'ri yozing:\n" + m[0], uz: null, t: 'fill', a: m[1].split(' / '), w: m[2], ref: [u.id, 'm', i], full: true}));
+  let it = pickBalanced(qPool(us, q => q.t === 'fill'), N - mis.length).map(({u, q, i}) => Object.assign({}, q, {uz: null, ref: [u.id, 'q', i]}));
+  let all = mis.concat(it);
+  if (all.length < N) all = all.concat(pickBalanced(qPool(us, q => q.t === 'choice'), N - all.length).map(({u, q, i}) => Object.assign({}, q, {uz: null, ref: [u.id, 'q', i]})));
+  return shuffle(all);
+}
+function openQuiz() { if (stack[stack.length - 1][0] === 'quiz') render(); else go('quiz'); }
 function startQuiz(id) {
-  QUIZ = {id, i: 0, answers: [], results: [], shown: false, done: false};
-  if (stack[stack.length - 1][0] === 'quiz') render(); else go('quiz', id);
+  const u = BY[id];
+  QUIZ = {mode: 'unit', id, items: u.q.map((q, i) => Object.assign({}, q, {ref: [id, 'q', i]})), i: 0, answers: [], results: [], shown: false, done: false};
+  openQuiz();
+}
+function startReview(level) {
+  const items = buildReview(level);
+  if (!items.length) { alertMsg('Avval kamida bitta unit testini topshiring.'); return; }
+  QUIZ = {mode: 'review', level, items, i: 0, answers: [], results: [], shown: false, done: false};
+  openQuiz();
 }
 function renderQuiz() {
-  const u = BY[QUIZ.id];
+  if (!QUIZ) return back();
   if (QUIZ.done) return renderResult();
-  const q = u.q[QUIZ.i], n = u.q.length;
-  let h = `<div style="display:flex;justify-content:space-between" class="muted"><span>Unit ${u.id} · Test</span><span>${QUIZ.i + 1} / ${n}</span></div>
+  const q = QUIZ.items[QUIZ.i], n = QUIZ.items.length;
+  const title = QUIZ.mode === 'unit' ? `Unit ${QUIZ.id} · Test` : `🏆 Takrorlash · ${LV[QUIZ.level]} · Unit ${q.ref[0]}`;
+  let h = `<div style="display:flex;justify-content:space-between" class="muted"><span>${title}</span><span>${QUIZ.i + 1} / ${n}</span></div>
            <div class="bar"><div style="width:${pct(QUIZ.i, n)}%"></div></div>
-           <div class="q">${esc(q.q)}</div><div class="muted">(${esc(q.uz)})</div>`;
+           <div class="q">${esc(q.q).replace(/\n/g, '<br>')}</div>${q.uz ? `<div class="muted">(${esc(q.uz)})</div>` : ''}`;
   if (q.t === 'choice') {
     h += q.o.map((o, i) => `<button class="opt" id="o${i}" onclick="answerChoice(${i})">${esc(o)}</button>`).join('');
   } else {
-    h += `<input class="ans" id="ans" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Javobni yozing…" onkeydown="if(event.key==='Enter')answerFill()" oninput="document.getElementById('err').textContent=''">
+    h += `<input class="ans" id="ans" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${q.full ? "To'g'ri gapni to'liq yozing…" : 'Javobni yozing…'}" onkeydown="if(event.key==='Enter')answerFill()" oninput="document.getElementById('err').textContent=''">
           <div class="err" id="err"></div><button class="btn" id="chk" onclick="answerFill()">Tekshirish</button>`;
   }
   h += `<div id="fb"></div>`;
@@ -199,50 +279,56 @@ function renderQuiz() {
 function feedback(ok, correct, why) {
   QUIZ.shown = true;
   haptic(ok ? 'success' : 'error');
-  const last = QUIZ.i === BY[QUIZ.id].q.length - 1;
+  const last = QUIZ.i === QUIZ.items.length - 1;
   document.getElementById('fb').innerHTML =
     `<div class="fb ${ok ? 'good' : 'bad'}"><b>${ok ? "✅ To'g'ri!" : "❌ Xato."}</b>${ok ? '' : ` To'g'ri javob: <b>${esc(correct)}</b>`}${why ? `<div style="margin-top:6px">💡 ${esc(why)}</div>` : ''}</div>
-     <button class="btn" onclick="nextQ()">${last ? '🏁 Natijani ko\'rish' : 'Keyingi savol →'}</button>`;
+     <button class="btn" onclick="nextQ()">${last ? "🏁 Natijani ko'rish" : 'Keyingi savol →'}</button>`;
+}
+function record(q, given, ok) {
+  QUIZ.answers.push(String(given).slice(0, 150));
+  QUIZ.results.push({q: q.q, given, correct: ansOf(q), ok});
+  feedback(ok, ansOf(q), q.w);
 }
 function answerChoice(i) {
   if (QUIZ.shown) return;
-  const q = BY[QUIZ.id].q[QUIZ.i], ok = i === q.c;
+  const q = QUIZ.items[QUIZ.i], ok = i === q.c;
   document.getElementById('o' + i).classList.add(ok ? 'good' : 'badc');
   if (!ok) document.getElementById('o' + q.c).classList.add('good');
-  QUIZ.answers.push(q.o[i]); QUIZ.results.push({q: q.q, given: q.o[i], correct: q.o[q.c], ok});
-  feedback(ok, q.o[q.c], q.w);
+  record(q, q.o[i], ok);
 }
 function answerFill() {
   if (QUIZ.shown) return;
   const inp = document.getElementById('ans'), v = inp.value;
   if (!v.trim()) { document.getElementById('err').textContent = 'Avval javobni yozing.'; return; }
-  const q = BY[QUIZ.id].q[QUIZ.i], ok = q.a.map(norm).includes(norm(v));
+  const q = QUIZ.items[QUIZ.i], ok = q.a.map(norm).includes(norm(v));
   inp.disabled = true; inp.style.borderColor = ok ? 'var(--ok)' : 'var(--bad)';
   document.getElementById('chk').remove();
-  QUIZ.answers.push(v); QUIZ.results.push({q: q.q, given: v, correct: q.a[0], ok});
-  feedback(ok, q.a[0], q.w);
+  record(q, v, ok);
 }
 function nextQ() {
   QUIZ.i++; QUIZ.shown = false;
-  if (QUIZ.i >= BY[QUIZ.id].q.length) QUIZ.done = true;
+  if (QUIZ.i >= QUIZ.items.length) QUIZ.done = true;
   renderQuiz();
 }
 function renderResult() {
   const r = QUIZ.results, s = r.filter(x => x.ok).length, p = pct(s, r.length);
   const emoji = p >= 80 ? '🎉' : (p >= 50 ? '👍' : '💪');
-  let h = `<div class="center muted">Unit ${QUIZ.id} tugadi</div><div class="big">${emoji} ${s}/${r.length}</div><div class="center muted">${p}%</div>`;
+  const name = QUIZ.mode === 'unit' ? `Unit ${QUIZ.id} tugadi` : `🏆 Takrorlash testi · ${LV[QUIZ.level]} tugadi`;
+  let h = `<div class="center muted">${name}</div><div class="big">${emoji} ${s}/${r.length}</div><div class="center muted">${p}%</div>`;
   h += `<button class="btn" onclick="sendResult()">📨 Natijani o'qituvchiga yuborish</button>
         <div class="muted center" style="margin-top:6px">Yuborilgach ilova yopiladi va natija botda ko'rinadi.</div>`;
-  h += `<div class="card">${r.map((x, i) => `<div class="res"><span>${x.ok ? '✅' : '❌'}</span><span>${i + 1}. ${esc(x.q)}<br>
+  h += `<div class="card">${r.map((x, i) => `<div class="res"><span>${x.ok ? '✅' : '❌'}</span><span>${i + 1}. ${esc(x.q).replace(/\n/g, '<br>')}<br>
          <span class="${x.ok ? 'right' : 'wrong'}">${esc(x.given)}</span>${x.ok ? '' : ` → <span class="right">${esc(x.correct)}</span>`}</span></div>`).join('')}</div>
-        <button class="btn ghost" onclick="startQuiz(${QUIZ.id})">🔄 Qaytadan yechish</button>`;
+        <button class="btn ghost" onclick="${QUIZ.mode === 'unit' ? `startQuiz(${QUIZ.id})` : `startReview('${QUIZ.level}')`}">🔄 ${QUIZ.mode === 'unit' ? 'Qaytadan yechish' : 'Yangi savollar bilan qayta'}</button>`;
   app.innerHTML = h;
 }
 function sendResult() {
-  const data = JSON.stringify({u: QUIZ.id, a: QUIZ.answers});
-  if (!tg || DEMO) { alertMsg("Sinov rejimida natija yuborilmaydi. Ilovani botdagi 📖 Darslar tugmasi orqali oching."); return; }
+  const data = QUIZ.mode === 'unit'
+    ? JSON.stringify({u: QUIZ.id, a: QUIZ.answers})
+    : JSON.stringify({r: QUIZ.level, it: QUIZ.items.map((q, k) => [q.ref[0], q.ref[1], q.ref[2], QUIZ.answers[k]])});
+  if (!tg || DEMO) { alertMsg("Sinov rejimida natija yuborilmaydi. Ilovani botdagi 📖 Darsni boshlash tugmasi orqali oching."); return; }
   try { tg.sendData(data); }
-  catch (e) { alertMsg("Natijani yuborib bo'lmadi. Ilovani botdagi pastki 📖 Darslar tugmasi orqali oching."); }
+  catch (e) { alertMsg("Natijani yuborib bo'lmadi. Ilovani botdagi pastki 📖 Darsni boshlash tugmasi orqali oching."); }
 }
 
 readProgress();
